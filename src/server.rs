@@ -16,22 +16,17 @@ pub trait ServerTrait {
 pub struct Server;
 
 impl ServerTrait for Server {
-    fn start_server(
-        &self,
-        address: String,
-        tx: mpsc::Sender<Result<(), Box<dyn Error + Send>>>,
-    ) {
+    fn start_server(&self, address: String, tx: mpsc::Sender<Result<(), Box<dyn Error + Send>>>) {
         println!("Starting the server");
-        let listener = TcpListener::bind(address);
 
-        match listener {
+        let listener = match TcpListener::bind(address) {
             Ok(_) => tx.send(Ok(())).unwrap(),
             Err(e) => {
                 println!("here {}", e);
                 tx.send(Err(Box::new(e))).unwrap();
                 return;
             }
-        }
+        };
 
         for stream in listener.unwrap().incoming() {
             match stream {
@@ -70,17 +65,15 @@ impl Server {
     }
 
     fn get_task_value(buf: String) -> Option<u8> {
-        let try_parse = || -> Result<u8, Box<dyn std::error::Error>> {
-            let numbers: Vec<&str> = buf.trim().split(':').collect();
-            let task_type = numbers.first().unwrap().parse::<u8>()?;
-            let seed = numbers.last().unwrap().parse::<u64>()?;
-
-            let result = Task::execute(task_type, seed);
-            Ok(result)
+        let parse_input = || -> Result<(u8, u64), Box<dyn std::error::Error>> {
+            let parts: Vec<&str> = buf.trim().split(':').collect();
+            let task_type = parts.first().unwrap().parse::<u8>()?;
+            let seed = parts.last().unwrap().parse::<u64>()?;
+            Ok((task_type, seed))
         };
 
-        match try_parse() {
-            Ok(r) => Some(r),
+        match parse_input() {
+            Ok((task_type, seed)) => Some(Task::execute(task_type, seed)),
             Err(_) => None
         }
     }
