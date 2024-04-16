@@ -19,7 +19,9 @@ impl ServerTrait for Server {
     fn start_server(&self, address: String, tx: mpsc::Sender<Result<(), Box<dyn Error + Send>>>) {
         println!("Starting the server");
 
-        let listener = match TcpListener::bind(address) {
+        let listener = TcpListener::bind(address);
+
+        match listener {
             Ok(_) => tx.send(Ok(())).unwrap(),
             Err(e) => {
                 println!("here {}", e);
