@@ -1,10 +1,11 @@
-use rand::{Rng, SeedableRng};
 // DO NOT MODIFY THIS FILE
 use std::io::{BufReader, Read, Write};
 use std::net::TcpStream;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Instant;
+
+use rand::{Rng, SeedableRng};
 
 const TOTAL_TASK_TYPE: usize = 2;
 
@@ -37,12 +38,12 @@ impl ClientTrait for Client {
 
         for i in 0..total_clients {
             let sender_clone = sender.clone();
-            let thread_seed = initial_seed + i as u64;
+            let thread_seed = initial_seed + 3211 * i as u64;
 
             let cloned_address = address.clone();
             let handle = thread::spawn(move || {
                 let mut rng = rand_chacha::ChaCha20Rng::seed_from_u64(thread_seed);
-                let mut current_seed_result = rng.gen::<u8>();
+                let mut current_seed_result = rng.gen::<u64>();
 
                 if let Ok(mut stream) = TcpStream::connect(cloned_address) {
                     for _ in 0..total_messages_per_client {
@@ -55,7 +56,8 @@ impl ClientTrait for Client {
 
                         let buf_reader = BufReader::new(&mut stream);
                         let data = Self::read_message(buf_reader).unwrap();
-                        current_seed_result = *data.first().unwrap();
+                        let new_seed = *data.first().unwrap();
+                        current_seed_result = (new_seed as u64).wrapping_add(rng.gen::<u64>());
                     }
 
                     sender_clone.send(current_seed_result).expect("unable to send data");
@@ -73,11 +75,10 @@ impl ClientTrait for Client {
 
         drop(sender);
 
-        let results: Vec<u8> = receiver.iter().collect();
+        let results: Vec<u64> = receiver.iter().collect();
         let final_sum = results
             .iter()
-            .map(|&x| u64::from(x))
-            .sum::<u64>();
+            .fold(0 as u64, |a, &b| a.wrapping_add(b));
         println!("Successfully collected results from all clients: {}", final_sum);
 
         let end_time = Instant::now();

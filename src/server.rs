@@ -3,6 +3,9 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc;
 
+use num_cpus;
+
+use crate::server_utils::get_task_value;
 use crate::task::Task;
 
 pub trait ServerTrait {
@@ -30,10 +33,22 @@ impl ServerTrait for Server {
             }
         };
 
+        // Set up thread pool
+        let num_cpus = num_cpus::get(); // Retrieve number of CPUs
+        eprintln!("Using all {} cpus found to set up a thread pool.", num_cpus);
+
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus)
+            .build()
+            .unwrap();
+
         for stream in listener.unwrap().incoming() {
             match stream {
                 Ok(stream) => {
-                    Self::handle_connection(stream);
+                    let stream = stream;
+                    pool.spawn(move || {
+                        Self::handle_connection(stream);
+                    });
                 }
                 Err(e) => {
                     eprintln!("Error accepting connection: {}", e);
@@ -53,8 +68,9 @@ impl Server {
                     return;
                 }
                 Ok(_) => {
-                    let response = Self::get_task_value(line);
+                    let response = get_task_value(line);
                     if let Some(r) = response {
+                        eprintln!("Finished executing task with new seed {}", r);
                         stream.write(&[r]).unwrap();
                     }
                 }
@@ -63,20 +79,6 @@ impl Server {
                     return;
                 }
             }
-        }
-    }
-
-    fn get_task_value(buf: String) -> Option<u8> {
-        let parse_input = || -> Result<(u8, u64), Box<dyn std::error::Error>> {
-            let parts: Vec<&str> = buf.trim().split(':').collect();
-            let task_type = parts.first().unwrap().parse::<u8>()?;
-            let seed = parts.last().unwrap().parse::<u64>()?;
-            Ok((task_type, seed))
-        };
-
-        match parse_input() {
-            Ok((task_type, seed)) => Some(Task::execute(task_type, seed)),
-            Err(_) => None
         }
     }
 }
