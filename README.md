@@ -7,15 +7,14 @@ pooling and parallelism, and the Tokio runtime for asynchronous I/O operations.
 
 The server follows these steps:
 - It creates a TCP listener to accept incoming client connections.
-- It sets up a thread pool using Rayon, with the number of threads equal to `min(twice the number of CPUs available on 
-the system, 40)`.
+- It sets up a thread pool using Rayon running multiple threads.
 - Each thread is spawned coonnected to an MPMC channel in Crossbeam to handle new client connections, and a separate 
 runtime in Tokio 
 that manages asynchronous task execution.
 - When each thread receives a new connection from the channel, it creates a new task containing the TCP stream within 
 the Tokio runtime to handle all task execution from that client.
-- The server processes the tasks from the TCP stream based on their type and writes the results back into the  stream
-- A global atomic counter is used to limit the total number of concurrent CPU-bound tasks
+- The server processes the tasks from the TCP stream based on their type and writes the results back into the stream.
+- A global atomic counter is used to limit the total number of concurrent CPU-bound tasks.
 - When the limit on CPU bound tasks is hit, the runtime awaits on a notification that will be sent once any CPU bound task is executed. 
 If the executing manages to increase the counter, it will start executing the CPU bound task.
 
